@@ -358,6 +358,23 @@ class Node(Base):
         return int(self.url.split("/")[-1])
     id = property(_get_id)
 
+    def index(self, properties):
+        # FIXME: hard coded for now
+        create_index_url = 'http://localhost:9999/index/node/{Key}/{Value}'
+
+        for property in properties:
+            create_index_url = create_index_url.replace("{Key}", property)
+            create_index_url = create_index_url.replace("{Value}", self.get(property))
+            response = Request().post(create_index_url, data=self.url)
+            if response.status == 201:
+                if response.body:
+                    if "indexed" in self._dic:
+                        self._dic["indexed"].append(response.body)
+                    else:
+                        self._dic["indexed"] = response.body
+            else:
+                raise StatusException(response.status, "Something went wrong")
+
     def traverse(self, types=None, order=None, stop=None, returnable=None,
                  uniqueness=None, is_stop_node=None, is_returnable=None,
                  returns=None):
@@ -781,7 +798,10 @@ class Request(object):
             authorization = "Basic %s" % base64_credentials[:-1]
             headers['Authorization'] = authorization
             headers['Remote-User'] = username
-        body = self._json_encode(data, ensure_ascii=True)
+        if type(data) == str:
+            body = data
+        else:
+            body = self._json_encode(data, ensure_ascii=True)
         connection.request(method, url, body, headers)
         response = connection.getresponse()
         response.body = response.read()
